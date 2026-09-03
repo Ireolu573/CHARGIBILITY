@@ -2,93 +2,132 @@
 
 > Living research document for the CHARGIBILITY project.
 >
-> Last reviewed: 2026-09-02
+> Last reviewed: 2026-09-03
 
 ## Purpose
 
-CHARGIBILITY is intended to route software-development tasks to the most suitable AI capability instead of hard-coding one model to one task. This document records provider capabilities, integration requirements, costs, limits, and trade-offs that will influence the routing architecture.
+CHARGIBILITY is intended to route software-development tasks to specialized AI providers. The project will begin with a deliberate provider assignment while keeping the provider layer replaceable so models can change later without rewriting the application.
 
-## Initial Findings
+## Initial Routing Strategy
 
-### OpenAI
+For the first version of CHARGIBILITY, the working assignment is:
 
-- OpenAI provides API access through the Responses API and official SDKs.
-- API access requires an API key.
-- The API supports streaming, tool use, file/image inputs, and agent-oriented workflows.
-- OpenAI has dedicated coding models in its current model catalog, including Codex-optimized models.
-- For CHARGIBILITY, OpenAI is a strong candidate for coding, reasoning, tool use, and agent orchestration.
+```text
+Frontend -> Claude
+Backend  -> Codex
+Database -> Gemini
+Ollama   -> Local AI option
+```
 
-Source: OpenAI API documentation.
+This is an initial product decision, not a permanent claim that these providers are always the best at these tasks.
+
+Ollama remains part of the equation because it gives CHARGIBILITY a local model path for development, experimentation, fallback use, and potentially specialized tasks.
+
+## Current Provider Findings
+
+### OpenAI / Codex
+
+OpenAI provides API access through its developer platform. Current OpenAI documentation lists dedicated Codex models optimized for agentic coding. GPT-5.3-Codex is described as an agentic coding model and supports configurable reasoning effort, a 400K context window, and up to 128K output tokens.
+
+For CHARGIBILITY:
+
+- Primary role: Backend
+- Strong fit: software implementation, debugging, reasoning, repository-oriented coding workflows
+- Research priority: API authentication, Codex-specific agent capabilities, tool execution, project context, cost, and rate limits
+
+Source: OpenAI developer documentation.
 
 ### Anthropic / Claude
 
-- Anthropic provides the Claude API and SDKs for application integration.
-- Claude is positioned for reasoning, analysis, coding, text, and visual inputs.
-- Claude models are available through Anthropic's platform and also through cloud providers such as Amazon Bedrock.
-- Current Claude offerings include models aimed at high-end reasoning/coding and faster, lower-cost workloads.
-- For CHARGIBILITY, Anthropic is a candidate provider for coding, code review, planning, and complex reasoning.
+Anthropic provides the Claude API and current Claude models for coding, reasoning, analysis, and agentic workloads. Anthropic's current documentation also provides guidance specifically for coding and frontend tasks and supports tool use for agentic workflows.
+
+For CHARGIBILITY:
+
+- Primary role: Frontend
+- Strong fit: frontend implementation, UI work, code review, reasoning, and design-oriented coding workflows
+- Research priority: API access, model selection, tool use, context limits, coding performance, cost, and rate limits
 
 Source: Anthropic developer documentation.
 
 ### Google Gemini
 
-- Gemini provides a developer API with free and paid usage tiers.
-- Current Gemini documentation lists models suitable for coding, reasoning, and agentic workloads.
-- Gemini 2.5 Pro is explicitly described as strong for coding and complex reasoning.
-- Gemini 2.5 Flash provides a large context window and a lower-cost/faster option.
-- The free tier provides free input and output tokens for eligible models, subject to rate limits.
-- For CHARGIBILITY, Gemini is a strong candidate for coding, reasoning, large-context project analysis, and lower-cost workloads.
+Google provides the Gemini API with current models for coding, reasoning, multimodal work, and agentic workflows. Gemini 2.5 Pro is explicitly described as a model for complex tasks with deep reasoning and coding capabilities. Google's current documentation also lists newer Gemini models for long-horizon software engineering and agentic workflows.
+
+Google identifies the Interactions API as the default interface for new Gemini projects. Gemini 2.5 and newer models also support implicit context caching.
+
+For CHARGIBILITY:
+
+- Primary role: Database
+- Strong fit: SQL generation, schema reasoning, database analysis, migrations, and large-context technical analysis
+- Research priority: API authentication, free-tier limits, structured output, tool use, context limits, caching, cost, and rate limits
 
 Source: Google AI for Developers documentation.
 
 ### Ollama
 
-- Ollama runs open models locally.
-- Local execution can keep prompts and project data on the user's machine.
-- Ollama can serve models to coding agents and allows models to be switched without changing the surrounding workflow.
-- Local models avoid per-token cloud API charges, but performance depends on available hardware.
-- For CHARGIBILITY, Ollama is important because it can provide a local/free provider option and a fallback when cloud APIs are unavailable or too expensive.
+Ollama runs open models locally and exposes a local API. Its chat API supports streaming, structured JSON/JSON Schema output, and tool calling. Ollama also provides OpenAI-compatible endpoints, which is useful for CHARGIBILITY because a common provider interface can potentially support both cloud providers and local models.
 
-Source: Ollama official website.
+For CHARGIBILITY:
 
-## Early Architectural Observation
+- Role: Local AI provider
+- Strong fit: private/local work, experimentation, fallback use, low-cost development, and tasks that do not require the strongest cloud model
+- Research priority: suitable coding models, RAM/CPU requirements, model size, context limits, tool calling, latency, and performance on the development machine
 
-CHARGIBILITY should not define routing as:
+Source: Ollama official documentation.
+
+## Architectural Principle
+
+The initial routing strategy is intentionally simple, but the implementation should still use a provider abstraction.
+
+Conceptually:
 
 ```text
-Frontend -> Claude
-Backend -> Codex
-Database -> Gemini
+User request
+    -> task classification
+    -> initial task route
+    -> provider adapter
+    -> model
+    -> result
 ```
 
-Instead, routing should be capability-based:
+The provider adapter prevents the rest of CHARGIBILITY from depending directly on one vendor's API format.
+
+Later, routing can evolve toward:
 
 ```text
 Task
   -> required capabilities
+  -> initial preferred provider
   -> available providers/models
-  -> constraints (cost, latency, privacy, context, availability)
+  -> constraints
   -> selected provider/model
 ```
 
-This allows providers and models to change without rewriting the application's core routing logic.
+Possible constraints include cost, latency, privacy, context size, availability, and model capability.
 
-## Questions Still To Research
+## Research Questions
 
-- Exact API authentication and account requirements for each provider
-- Current free-tier limits and restrictions
-- Current model IDs and lifecycle/deprecation policies
-- Tool/function calling differences
-- Streaming differences
-- Context-window differences
-- Structured output support
-- File and repository analysis capabilities
-- Coding-agent capabilities versus raw model APIs
-- Local model hardware requirements on the CHARGIBILITY development machine
-- Additional providers worth supporting
-- How to measure provider quality for different task types
-- How CHARGIBILITY should handle provider failures, rate limits, and unavailable models
+- What account and API-key requirements apply to each provider?
+- Which models should CHARGIBILITY use initially?
+- Which providers have meaningful free usage?
+- What are the current rate limits?
+- How do streaming implementations differ?
+- How do tool/function calling implementations differ?
+- How should project files be supplied to each provider?
+- How should CHARGIBILITY protect API keys?
+- What can Ollama realistically run on the development machine?
+- How should provider failures and rate limits be handled?
+- How should we evaluate the three primary providers against real CHARGIBILITY tasks?
 
 ## Current Position
 
-No provider is permanently assigned to a task category yet. The project will make provider selection a replaceable architectural concern and use research plus real experiments to determine routing rules.
+The working assignment is:
+
+```text
+Frontend -> Claude
+Backend  -> Codex
+Database -> Gemini
+Ollama   -> Local AI option
+```
+
+This assignment will guide the first research and prototype experiments. It can be revised later based on measured results, cost, availability, and user experience.
